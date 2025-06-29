@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenWrt 流量监控仪表板</title>
+    <link href="./bootstrap.min.css" rel="stylesheet">
+    <script src="./chart.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card {
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .card-header {
+            font-weight: 600;
+            background-color: #4a6cf7;
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 15px;
+        }
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #4a6cf7;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+        .last-update {
+            text-align: right;
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="text-center">OpenWrt 流量监控仪表板</h1>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 源IP/目的IP卡片 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">IP 地址信息</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 stat-card">
+                                <div class="stat-label">源 IP 地址</div>
+                                <div id="src-ip" class="stat-value">-</div>
+                            </div>
+                            <div class="col-md-6 stat-card">
+                                <div class="stat-label">目的 IP 地址</div>
+                                <div id="dst-ip" class="stat-value">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 峰值流量卡片 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">峰值流量</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 stat-card">
+                                <div class="stat-label">接收峰值 (bytes)</div>
+                                <div id="peak-rx" class="stat-value">-</div>
+                            </div>
+                            <div class="col-md-6 stat-card">
+                                <div class="stat-label">发送峰值 (bytes)</div>
+                                <div id="peak-tx" class="stat-value">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 累计流量卡片 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">累计流量</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 stat-card">
+                                <div class="stat-label">接收总量 (bytes)</div>
+                                <div id="total-rx" class="stat-value">-</div>
+                            </div>
+                            <div class="col-md-6 stat-card">
+                                <div class="stat-label">发送总量 (bytes)</div>
+                                <div id="total-tx" class="stat-value">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 平均流量卡片 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">平均流量</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 stat-card">
+                                <div class="stat-label">2秒接收 (bytes/s)</div>
+                                <div id="avg-2s-rx" class="stat-value">-</div>
+                            </div>
+                            <div class="col-md-4 stat-card">
+                                <div class="stat-label">10秒接收 (bytes/s)</div>
+                                <div id="avg-10s-rx" class="stat-value">-</div>
+                            </div>
+                            <div class="col-md-4 stat-card">
+                                <div class="stat-label">40秒接收 (bytes/s)</div>
+                                <div id="avg-40s-rx" class="stat-value">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 流量趋势图表 -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">接收流量趋势</div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="rx-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">发送流量趋势</div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="tx-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="last-update">
+            最后更新时间: <span id="last-update">-</span>
+        </div>
+    </div>
+
+    <script>
+        // 图表配置
+        const chartConfig = {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Bytes/s'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '时间'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        };
+
+        // 初始化图表
+        const rxCtx = document.getElementById('rx-chart').getContext('2d');
+        const rxChart = new Chart(rxCtx, {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '接收流量',
+                    data: [],
+                    borderColor: '#4a6cf7',
+                    backgroundColor: 'rgba(74, 108, 247, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            }
+        });
+
+        const txCtx = document.getElementById('tx-chart').getContext('2d');
+        const txChart = new Chart(txCtx, {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '发送流量',
+                    data: [],
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            }
+        });
+
+        // 数据历史记录
+        const dataHistory = {
+            timestamps: [],
+            rxData: [],
+            txData: []
+        };
+
+        // 获取 OpenWrt 设备的 IP 地址
+        function getOpenWrtIP() {
+            //  OpenWrt 的 IP 是 192.168.1.1
+            return '192.168.70.101';
+        }
+
+        // 从 API 获取数据
+        async function fetchTrafficData() {
+            try {
+                const response = await fetch(`http://${getOpenWrtIP()}:8080/api/data`);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching traffic data:', error);
+                return null;
+            }
+        }
+
+        // 更新仪表板
+        function updateDashboard(data) {
+            if (!data) return;
+            
+            // 更新基本信息 - 调整为匹配后端API的字段名
+            document.getElementById('src-ip').textContent = data.source_ip || '-';
+            document.getElementById('dst-ip').textContent = data.destination_ip || '-';
+            document.getElementById('total-rx').textContent = (data.total_received || 0).toLocaleString();
+            document.getElementById('total-tx').textContent = (data.total_transmitted || 0).toLocaleString();
+            document.getElementById('peak-rx').textContent = (data.peak_received || 0).toLocaleString();
+            document.getElementById('peak-tx').textContent = (data.peak_transmitted || 0).toLocaleString();
+            document.getElementById('avg-2s-rx').textContent = (data.last_2s_rx || 0).toLocaleString();
+            document.getElementById('avg-10s-rx').textContent = (data.last_10s_rx || 0).toLocaleString();
+            document.getElementById('avg-40s-rx').textContent = (data.last_40s_rx || 0).toLocaleString();
+            
+            // 更新时间戳
+            const timestamp = new Date(data.timestamp * 1000); // 转换为毫秒
+            document.getElementById('last-update').textContent = 
+                timestamp.toLocaleTimeString();
+            
+            // 更新图表数据
+            const timeLabel = timestamp.toLocaleTimeString();
+            dataHistory.timestamps.push(timeLabel);
+            dataHistory.rxData.push(data.last_2s_rx || 0);
+            dataHistory.txData.push(data.last_2s_tx || 0);
+            
+            // 保留最近 20 个数据点
+            if (dataHistory.timestamps.length > 20) {
+                dataHistory.timestamps.shift();
+                dataHistory.rxData.shift();
+                dataHistory.txData.shift();
+            }
+            
+            // 更新图表
+            rxChart.data.labels = dataHistory.timestamps;
+            rxChart.data.datasets[0].data = dataHistory.rxData;
+            rxChart.update();
+            
+            txChart.data.labels = dataHistory.timestamps;
+            txChart.data.datasets[0].data = dataHistory.txData;
+            txChart.update();
+        }
+
+        // 定时更新数据
+        async function updateData() {
+            const data = await fetchTrafficData();
+            updateDashboard(data);
+        }
+
+        // 页面加载完成后开始轮询
+        document.addEventListener('DOMContentLoaded', () => {
+            updateData(); // 立即获取一次数据
+            setInterval(updateData, 2000); // 每2秒更新一次
+        });
+    </script>
+</body>
+</html>

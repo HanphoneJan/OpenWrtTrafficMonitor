@@ -1,0 +1,3 @@
+/home/hanphone/openwrt-projects/project1/build/CMakeFiles/lab2.dir
+/home/hanphone/openwrt-projects/project1/build/CMakeFiles/edit_cache.dir
+/home/hanphone/openwrt-projects/project1/build/CMakeFiles/rebuild_cache.dir
